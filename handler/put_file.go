@@ -2,7 +2,7 @@ package handler
 
 import (
 	"github.com/gin-gonic/gin"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"time"
 	"worker/app"
@@ -33,7 +33,7 @@ func PutFile(c *gin.Context) {
 	defer func() {
 		_ = file.Close()
 	}()
-	fileData, err := ioutil.ReadAll(file)
+	fileData, err := io.ReadAll(file)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"message": err})
 		return

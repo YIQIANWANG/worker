@@ -2,7 +2,6 @@ package dal
 
 import (
 	"context"
-	"fmt"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 	"worker/conf"
@@ -17,6 +16,7 @@ func NewMongoClient() (*MongoClient, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	return &MongoClient{client: client}, nil
 }
 
@@ -24,6 +24,7 @@ func (mc *MongoClient) GetDataBase() *mongo.Database {
 	return mc.client.Database(conf.DATABASE)
 }
 
+/*
 func getURI() string {
 	protocol := conf.PROTOCOL
 	username := conf.USERNAME
@@ -31,4 +32,9 @@ func getURI() string {
 	address := conf.ADDRESS
 	authentication := conf.AUTHENTICATION
 	return fmt.Sprintf("%s://%s:%s@%s/%s", protocol, username, password, address, authentication)
+}
+*/
+
+func getURI() string {
+	return "mongodb://localhost:27017"
 }

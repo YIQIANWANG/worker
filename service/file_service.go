@@ -48,7 +48,8 @@ func (fs *FileService) PutFile(userName, bucketName, fileName string, fileData [
 	// 更新业务数据
 	err := fs.mongoOperator.UpdateUserCount(userName, bucketName, 1)
 	if err != nil {
-		log.Println("Update User Failed: ", err)
+		log.Println("Put File Failed: ", err)
+		return err
 	}
 	return nil
 }
@@ -58,7 +59,7 @@ func (fs *FileService) GetFile(userName, bucketName, fileName string) ([]byte, e
 	firstChunkID := getChunkID(userName, bucketName, fileName, 0)
 	firstChunk, err := fs.mongoOperator.GetChunk(firstChunkID)
 	if err != nil {
-		log.Println("Get Chunk Failed: ", err)
+		log.Println("Get File Failed: ", err)
 		return nil, err
 	}
 
@@ -83,7 +84,8 @@ func (fs *FileService) GetFile(userName, bucketName, fileName string) ([]byte, e
 	// 更新业务数据
 	err = fs.mongoOperator.UpdateUserCount(firstChunk.UserName, firstChunk.BucketName, 0)
 	if err != nil {
-		log.Println("Update User Failed: ", err)
+		log.Println("Get File Failed: ", err)
+		return nil, err
 	}
 	return fileData, nil
 }
@@ -93,7 +95,7 @@ func (fs *FileService) DelFile(userName, bucketName, fileName string) error {
 	firstChunkID := getChunkID(userName, bucketName, fileName, 0)
 	firstChunk, err := fs.mongoOperator.GetChunk(firstChunkID)
 	if err != nil {
-		log.Println("Get Chunk Failed: ", err)
+		log.Println("Del File Failed: ", err)
 		return err
 	}
 
@@ -113,7 +115,8 @@ func (fs *FileService) DelFile(userName, bucketName, fileName string) error {
 	// 更新业务数据
 	err = fs.mongoOperator.UpdateUserCount(firstChunk.UserName, firstChunk.BucketName, -1)
 	if err != nil {
-		log.Println("Update User Failed: ", err)
+		log.Println("Del File Failed: ", err)
+		return err
 	}
 	return nil
 }
@@ -147,7 +150,7 @@ func (fs *FileService) putChunk(userName, bucketName, fileName string, chunkData
 	go func() {
 		err := fs.mongoOperator.UpdateGroupAvailableCap(groupID, -size)
 		if err != nil {
-			log.Println("Update Group Failed: ", err)
+			log.Println("Put Chunk Failed: ", err)
 		}
 		wg.Done()
 	}()
@@ -163,7 +166,7 @@ func (fs *FileService) putChunk(userName, bucketName, fileName string, chunkData
 		}
 		err := fs.mongoOperator.InsertChunk(chunk)
 		if err != nil {
-			log.Println("Insert Chunk Failed: ", err)
+			log.Println("Put Chunk Failed: ", err)
 		}
 		wg.Done()
 	}()
@@ -224,48 +227,68 @@ func (fs *FileService) getChunk(chunkID string) ([]byte, error) {
 
 func (fs *FileService) delChunk(chunkID string) error {
 	// 查询GroupID
-	groupID := getGroupIDsByChunkID(chunkID)[0]
+	groupIDs := getGroupIDsByChunkID(chunkID)
 
 	// 选择Storages
-	var storagesAddress []string
-	for _, storage := range data.Groups.GroupInfos[groupID] {
-		storagesAddress = append(storagesAddress, storage.StorageAddress)
+	var storagesAddress [2][]string
+	for _, storage := range data.Groups.GroupInfos[groupIDs[0]] {
+		storagesAddress[0] = append(storagesAddress[0], storage.StorageAddress)
+	}
+	for _, storage := range data.Groups.GroupInfos[groupIDs[1]] {
+		storagesAddress[1] = append(storagesAddress[1], storage.StorageAddress)
 	}
 
 	// 请求Storages
-	wg := sync.WaitGroup{}
-	wg.Add(len(storagesAddress))
-	for _, address := range storagesAddress {
+	var size [2]int
+	wg := [2]sync.WaitGroup{}
+	wg[0].Add(len(storagesAddress[0]))
+	wg[1].Add(len(storagesAddress[1]))
+	for _, address := range storagesAddress[0] {
 		go func(address string) {
-			_ = fs.storageOperator.DelChunk(address, chunkID)
-			wg.Done()
+			size[0], _ = fs.storageOperator.DelChunk(address, chunkID)
+			wg[0].Done()
 		}(address)
 	}
-	wg.Wait()
-
-	// 读取Chunk所占空间
-	chunk, err := fs.mongoOperator.GetChunk(chunkID)
-	if err != nil {
-		log.Println("Get Chunk Failed: ", err)
+	for _, address := range storagesAddress[1] {
+		go func(address string) {
+			size[1], _ = fs.storageOperator.DelChunk(address, chunkID)
+			wg[1].Done()
+		}(address)
 	}
+	wg[0].Done()
+	wg[1].Done()
 
 	// 更新业务数据
-	wg = sync.WaitGroup{}
-	wg.Add(2)
-	go func() {
-		err := fs.mongoOperator.UpdateGroupAvailableCap(groupID, chunk.Size)
-		if err != nil {
-			log.Println("Update Group Failed: ", err)
-		}
-		wg.Done()
-	}()
+	wg2 := sync.WaitGroup{}
+	wg2.Add(1)
 	go func() {
 		err := fs.mongoOperator.DeleteChunk(chunkID)
 		if err != nil {
-			log.Println("Delete Chunk Failed: ", err)
+			log.Println("Del Chunk Failed: ", err)
 		}
-		wg.Done()
+		wg2.Done()
 	}()
-	wg.Wait()
+	if size[0] > 0 {
+		wg2.Add(1)
+		go func() {
+			err := fs.mongoOperator.UpdateGroupAvailableCap(groupIDs[0], size[0])
+			if err != nil {
+				log.Println("Del Chunk Failed: ", err)
+			}
+			wg2.Done()
+		}()
+	}
+	if size[1] > 0 {
+		wg2.Add(1)
+		go func() {
+			err := fs.mongoOperator.UpdateGroupAvailableCap(groupIDs[1], size[1])
+			if err != nil {
+				log.Println("Del Chunk Failed: ", err)
+			}
+			wg2.Done()
+		}()
+	}
+	wg2.Wait()
+
 	return nil
 }

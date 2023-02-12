@@ -14,11 +14,13 @@ func PathExists(path string) bool {
 	if err == nil || !os.IsNotExist(err) {
 		return true
 	}
+
 	return false
 }
 
 func getChunkID(userName, bucketName, fileName string, sequence int) string {
 	str := userName + "/" + bucketName + "/" + fileName + "/" + strconv.Itoa(sequence)
+
 	return base64.StdEncoding.EncodeToString([]byte(str))
 }
 
@@ -27,6 +29,7 @@ func getShardIDByChunkID(chunkID string) uint32 {
 	if shardID == math.MaxUint32 {
 		shardID = math.MaxUint32 - 1
 	}
+
 	return shardID
 }
 
@@ -37,5 +40,6 @@ func getGroupIDsByChunkID(chunkID string) []string {
 			return []string{mappingInfo.GroupID, mappingInfo.OldGroupID}
 		}
 	}
+
 	return nil
 }

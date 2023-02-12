@@ -20,14 +20,6 @@ func (us *UserService) GetUserStatistics(userName string) (*model.User, error) {
 		log.Println("Get UserInfo Failed: ", err)
 		return nil, err
 	}
-	return user, nil
-}
 
-func (us *UserService) GetUserFiles(userName, bucketName string) ([]string, error) {
-	fileNames, err := us.mongoOperator.GetFileNamesByUserNameAndBucketName(userName, bucketName)
-	if err != nil {
-		log.Println("Get UserFiles Failed: ", err)
-		return nil, err
-	}
-	return fileNames, nil
+	return user, nil
 }

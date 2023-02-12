@@ -26,6 +26,8 @@ func LogInit() {
 			panic(err)
 		}
 	}
+
+	// error log
 	logFile := fmt.Sprintf("%s/%s-%s-%s", conf.LogFilePath, time.Now().Format("2006"), time.Now().Format("01"), time.Now().Format("02"))
 	file, err := os.OpenFile(logFile, os.O_CREATE|os.O_APPEND|os.O_RDWR, os.ModePerm) // 创建、追加、读写，777（所有权限）
 	if err != nil {

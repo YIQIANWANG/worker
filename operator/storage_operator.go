@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"net/url"
 	"worker/model"
@@ -28,12 +27,13 @@ func (so *StorageOperator) PutChunk(storageAddress string, chunkID string, data 
 	if err != nil {
 		return err
 	}
+
 	defer func(Body io.ReadCloser) {
 		_ = Body.Close()
 	}(resp.Body)
 	if resp.StatusCode == http.StatusBadRequest {
-		body, _ := ioutil.ReadAll(resp.Body)
-		var storageResponse model.StorageResponse
+		body, _ := io.ReadAll(resp.Body)
+		var storageResponse model.DefaultResponse
 		_ = json.Unmarshal(body, &storageResponse)
 		return errors.New(storageResponse.Message)
 	}
@@ -51,21 +51,22 @@ func (so *StorageOperator) GetChunk(storageAddress string, chunkID string) ([]by
 	if err != nil {
 		return nil, err
 	}
+
 	defer func(Body io.ReadCloser) {
 		_ = Body.Close()
 	}(resp.Body)
 	if resp.StatusCode == http.StatusBadRequest {
-		body, _ := ioutil.ReadAll(resp.Body)
-		var storageResponse model.StorageResponse
+		body, _ := io.ReadAll(resp.Body)
+		var storageResponse model.DefaultResponse
 		_ = json.Unmarshal(body, &storageResponse)
 		return nil, errors.New(storageResponse.Message)
 	}
 
-	body, _ := ioutil.ReadAll(resp.Body)
+	body, _ := io.ReadAll(resp.Body)
 	return body, nil
 }
 
-func (so *StorageOperator) DelChunk(storageAddress string, chunkID string) error {
+func (so *StorageOperator) DelChunk(storageAddress string, chunkID string) (int, error) {
 	reqUrl, _ := url.Parse("http://" + storageAddress + "/chunk")
 	params := url.Values{}
 	params.Set("chunkID", chunkID)
@@ -74,19 +75,20 @@ func (so *StorageOperator) DelChunk(storageAddress string, chunkID string) error
 
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
-		return err
+		return -1, err
 	}
+
 	defer func(Body io.ReadCloser) {
 		_ = Body.Close()
 	}(resp.Body)
+	body, _ := io.ReadAll(resp.Body)
+	var storageResponse model.DelChunkResponse
+	_ = json.Unmarshal(body, &storageResponse)
 	if resp.StatusCode == http.StatusBadRequest {
-		body, _ := ioutil.ReadAll(resp.Body)
-		var storageResponse model.StorageResponse
-		_ = json.Unmarshal(body, &storageResponse)
-		return errors.New(storageResponse.Message)
+		return -1, errors.New(storageResponse.Message)
 	}
 
-	return nil
+	return storageResponse.Size, nil
 }
 
 func (so *StorageOperator) GetChunkIDs(storageAddress string) ([]string, error) {
@@ -100,65 +102,16 @@ func (so *StorageOperator) GetChunkIDs(storageAddress string) ([]string, error) 
 		_ = Body.Close()
 	}(resp.Body)
 	if resp.StatusCode == http.StatusBadRequest {
-		body, _ := ioutil.ReadAll(resp.Body)
-		var storageResponse model.StorageResponse
+		body, _ := io.ReadAll(resp.Body)
+		var storageResponse model.DefaultResponse
 		_ = json.Unmarshal(body, &storageResponse)
 		return nil, errors.New(storageResponse.Message)
 	}
 
-	body, _ := ioutil.ReadAll(resp.Body)
+	body, _ := io.ReadAll(resp.Body)
 	var chunkIDs []string
 	_ = json.Unmarshal(body, &chunkIDs)
 	return chunkIDs, nil
-}
-
-func (so *StorageOperator) SyncChunk(dstAddress, srcAddress, chunkID string) error {
-	reqUrl, _ := url.Parse("http://" + srcAddress + "/sync")
-	params := url.Values{}
-	params.Set("dstAddress", dstAddress)
-	params.Set("mode", "chunk")
-	params.Set("chunkID", chunkID)
-	reqUrl.RawQuery = params.Encode()
-
-	resp, err := http.Get(reqUrl.String())
-	if err != nil {
-		return err
-	}
-	defer func(Body io.ReadCloser) {
-		_ = Body.Close()
-	}(resp.Body)
-	if resp.StatusCode == http.StatusBadRequest {
-		body, _ := ioutil.ReadAll(resp.Body)
-		var storageResponse model.StorageResponse
-		_ = json.Unmarshal(body, &storageResponse)
-		return errors.New(storageResponse.Message)
-	}
-
-	return nil
-}
-
-func (so *StorageOperator) SyncAll(dstAddress, srcAddress string) error {
-	reqUrl, _ := url.Parse("http://" + srcAddress + "/sync")
-	params := url.Values{}
-	params.Set("dstAddress", dstAddress)
-	params.Set("mode", "all")
-	reqUrl.RawQuery = params.Encode()
-
-	resp, err := http.Get(reqUrl.String())
-	if err != nil {
-		return err
-	}
-	defer func(Body io.ReadCloser) {
-		_ = Body.Close()
-	}(resp.Body)
-	if resp.StatusCode == http.StatusBadRequest {
-		body, _ := ioutil.ReadAll(resp.Body)
-		var storageResponse model.StorageResponse
-		_ = json.Unmarshal(body, &storageResponse)
-		return errors.New(storageResponse.Message)
-	}
-
-	return nil
 }
 
 func (so *StorageOperator) PING(storageAddress string) {

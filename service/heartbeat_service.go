@@ -34,7 +34,7 @@ func (hs *HeartbeatService) StartCheck() {
 				if err != nil {
 					log.Println("Get GlobalGroups Failed: ", err)
 				}
-				hs.checkNew(newGroups)
+				hs.check(newGroups)
 				data.Groups = newGroups
 			}()
 			time.Sleep(conf.HeartbeatInternal * time.Second)
@@ -109,7 +109,7 @@ func (hs *HeartbeatService) GetGlobalGroups() (*data.GlobalGroups, error) {
 }
 
 // 检查是否有新的Group，或旧的Group里出现了新的Storage
-func (hs *HeartbeatService) checkNew(newGroups *data.GlobalGroups) {
+func (hs *HeartbeatService) check(newGroups *data.GlobalGroups) {
 	for groupID, _ := range newGroups.GroupInfos {
 		// 新的Group出现
 		if !data.Groups.GroupsExist[groupID] {
@@ -155,22 +155,7 @@ func (hs *HeartbeatService) checkNew(newGroups *data.GlobalGroups) {
 				wg.Add(n)
 				for _, storage := range newGroups.GroupInfos[groupID] {
 					go func(dstAddress string) {
-						for i := range toTransChunkIDs {
-							_ = hs.storageOperator.SyncChunk(dstAddress, srcAddress, toTransChunkIDs[i])
-						}
-						wg.Done()
-					}(storage.StorageAddress)
-				}
-				wg.Wait()
-				// 并发删除
-				n = len(data.Groups.GroupInfos[oldGroupID])
-				wg = sync.WaitGroup{}
-				wg.Add(n)
-				for _, storage := range data.Groups.GroupInfos[oldGroupID] {
-					go func(oldStorageAddress string) {
-						for i := range toTransChunkIDs {
-							_ = hs.storageOperator.DelChunk(oldStorageAddress, toTransChunkIDs[i])
-						}
+						_ = hs.transChunks(dstAddress, groupID, srcAddress, oldGroupID, toTransChunkIDs)
 						wg.Done()
 					}(storage.StorageAddress)
 				}
@@ -196,11 +181,72 @@ func (hs *HeartbeatService) checkNew(newGroups *data.GlobalGroups) {
 					canSyncAddress = append(canSyncAddress, storage.StorageAddress)
 				}
 			}
+			// 筛选需要同步的ChunkID
+			chunkIDs, err := hs.storageOperator.GetChunkIDs(canSyncAddress[0])
+			if err != nil {
+				log.Println("Storage check failed: ", err)
+				return
+			}
+			// 并发同步
 			for i := range toSyncAddress {
 				go func(dstAddress string) {
-					_ = hs.storageOperator.SyncAll(dstAddress, canSyncAddress[0])
+					_ = hs.syncChunks(dstAddress, canSyncAddress[0], chunkIDs)
 				}(toSyncAddress[i])
 			}
 		}
 	}
+}
+
+// 指定源存储实例，将一批Chunk迁移给其他存储组的目的存储实例。
+// TODO 并发不一致
+func (hs *HeartbeatService) transChunks(dstAddress, dstGroupID, srcAddress, srcGroupID string, chunkIDs []string) error {
+	for _, chunkID := range chunkIDs {
+		// 从源存储实例读取Chunk
+		chunkData, err := hs.storageOperator.GetChunk(srcAddress, chunkID)
+		if err != nil {
+			log.Println("Trans Chunks failed: ", err)
+			continue
+		}
+		// 目的存储实例写入Chunk
+		err = hs.storageOperator.PutChunk(dstAddress, chunkID, chunkData)
+		if err != nil {
+			log.Println("Trans Chunks failed: ", err)
+			continue
+		}
+		err = hs.mongoOperator.UpdateGroupAvailableCap(dstGroupID, -len(chunkData))
+		if err != nil {
+			log.Println("Trans Chunks failed: ", err)
+			continue
+		}
+
+		// 源存储实例删除Chunk
+		_, err = hs.storageOperator.DelChunk(srcAddress, chunkID)
+		if err != nil {
+			log.Println("Trans Chunks failed: ", err)
+			continue
+		}
+		err = hs.mongoOperator.UpdateGroupAvailableCap(srcGroupID, len(chunkData))
+		if err != nil {
+			log.Println("Trans Chunks failed: ", err)
+		}
+	}
+
+	return nil
+}
+
+// 指定源存储实例，将一批Chunk同步给同存储组的目的存储实例。
+func (hs *HeartbeatService) syncChunks(dstAddress, srcAddress string, chunkIDs []string) error {
+	for _, chunkID := range chunkIDs {
+		chunkData, err := hs.storageOperator.GetChunk(srcAddress, chunkID)
+		if err != nil {
+			log.Println("Sync Chunks failed: ", err)
+			continue
+		}
+		err = hs.storageOperator.PutChunk(dstAddress, chunkID, chunkData)
+		if err != nil {
+			log.Println("Sync Chunks failed: ", err)
+		}
+	}
+
+	return nil
 }
