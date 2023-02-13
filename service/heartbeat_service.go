@@ -136,7 +136,7 @@ func (hs *HeartbeatService) check(newGroups *data.GlobalGroups) {
 			// 需要转移数据
 			go func() {
 				// 查到可用源storage
-				srcAddress := data.Groups.GroupInfos[oldGroupID][0].StorageAddress
+				srcAddress := newGroups.GroupInfos[oldGroupID][0].StorageAddress
 				// 筛选需要转移的ChunkID
 				chunkIDs, err := hs.storageOperator.GetChunkIDs(srcAddress)
 				if err != nil {
@@ -155,16 +155,50 @@ func (hs *HeartbeatService) check(newGroups *data.GlobalGroups) {
 				wg.Add(n)
 				for _, storage := range newGroups.GroupInfos[groupID] {
 					go func(dstAddress string) {
-						_ = hs.transChunks(dstAddress, groupID, srcAddress, oldGroupID, toTransChunkIDs)
+						_ = hs.transChunks(dstAddress, srcAddress, toTransChunkIDs)
 						wg.Done()
 					}(storage.StorageAddress)
 				}
 				wg.Wait()
-				// 去掉配置中心对应表项的OldGroupID字段
+				// 删除
+				size := 0
+				n = len(newGroups.GroupInfos[oldGroupID])
+				wg = sync.WaitGroup{}
+				wg.Add(n - 1)
+				for i := 1; i < n; i++ {
+					go func(index int) {
+						sum := 0
+						for _, chunkID := range chunkIDs {
+							dataSize, err := hs.storageOperator.DelChunk(newGroups.GroupInfos[oldGroupID][index].StorageAddress, chunkID)
+							if err != nil {
+								log.Println("Trans Chunks failed: ", err)
+								continue
+							}
+							sum += dataSize
+						}
+						size = sum
+						wg.Done()
+					}(i)
+				}
+				wg.Wait()
+				// 更新存储组信息
+				err = hs.mongoOperator.UpdateGroupAvailableCap(groupID, -size)
+				if err != nil {
+					log.Println("Trans Chunks failed: ", err)
+				}
+
+				err = hs.mongoOperator.UpdateGroupAvailableCap(oldGroupID, size)
+				if err != nil {
+					log.Println("Trans Chunks failed: ", err)
+				}
+				// 配置中心对应表项OldGroupID字段置空
 				sharID := getShardIDByChunkID(toTransChunkIDs[0])
 				for _, mappingInfo := range data.Map.MappingInfos {
 					if mappingInfo.ShardIDStart <= sharID && sharID < mappingInfo.ShardIDEnd {
-						_ = hs.mongoOperator.UpdateMappingInfoDeleteOldGroupID(mappingInfo.ShardIDStart, mappingInfo.ShardIDEnd)
+						err := hs.mongoOperator.UpdateMappingInfoDeleteOldGroupID(mappingInfo.ShardIDStart, mappingInfo.ShardIDEnd)
+						if err != nil {
+							log.Println("Trans Chunks failed: ", err)
+						}
 						break
 					}
 				}
@@ -181,17 +215,22 @@ func (hs *HeartbeatService) check(newGroups *data.GlobalGroups) {
 					canSyncAddress = append(canSyncAddress, storage.StorageAddress)
 				}
 			}
-			// 筛选需要同步的ChunkID
-			chunkIDs, err := hs.storageOperator.GetChunkIDs(canSyncAddress[0])
-			if err != nil {
-				log.Println("Storage check failed: ", err)
-				return
-			}
-			// 并发同步
-			for i := range toSyncAddress {
-				go func(dstAddress string) {
-					_ = hs.syncChunks(dstAddress, canSyncAddress[0], chunkIDs)
-				}(toSyncAddress[i])
+			// 需要同步数据
+			if len(toSyncAddress) > 0 {
+				go func() {
+					// 筛选需要同步的ChunkID
+					chunkIDs, err := hs.storageOperator.GetChunkIDs(canSyncAddress[0])
+					if err != nil {
+						log.Println("Storage check failed: ", err)
+						return
+					}
+					// 并发同步
+					for i := range toSyncAddress {
+						go func(dstAddress string) {
+							_ = hs.syncChunks(dstAddress, canSyncAddress[0], chunkIDs)
+						}(toSyncAddress[i])
+					}
+				}()
 			}
 		}
 	}
@@ -199,7 +238,7 @@ func (hs *HeartbeatService) check(newGroups *data.GlobalGroups) {
 
 // 指定源存储实例，将一批Chunk迁移给其他存储组的目的存储实例。
 // TODO 并发不一致
-func (hs *HeartbeatService) transChunks(dstAddress, dstGroupID, srcAddress, srcGroupID string, chunkIDs []string) error {
+func (hs *HeartbeatService) transChunks(dstAddress, srcAddress string, chunkIDs []string) error {
 	for _, chunkID := range chunkIDs {
 		// 从源存储实例读取Chunk
 		chunkData, err := hs.storageOperator.GetChunk(srcAddress, chunkID)
@@ -213,21 +252,11 @@ func (hs *HeartbeatService) transChunks(dstAddress, dstGroupID, srcAddress, srcG
 			log.Println("Trans Chunks failed: ", err)
 			continue
 		}
-		err = hs.mongoOperator.UpdateGroupAvailableCap(dstGroupID, -len(chunkData))
-		if err != nil {
-			log.Println("Trans Chunks failed: ", err)
-			continue
-		}
-
 		// 源存储实例删除Chunk
 		_, err = hs.storageOperator.DelChunk(srcAddress, chunkID)
 		if err != nil {
 			log.Println("Trans Chunks failed: ", err)
 			continue
-		}
-		err = hs.mongoOperator.UpdateGroupAvailableCap(srcGroupID, len(chunkData))
-		if err != nil {
-			log.Println("Trans Chunks failed: ", err)
 		}
 	}
 
