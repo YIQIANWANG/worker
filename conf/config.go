@@ -1,6 +1,6 @@
 package conf
 
-// 文件路径
+// 文件存放路径
 const (
 	LogFilePath = "logs"
 )
@@ -13,7 +13,7 @@ const (
 	HeartbeatInternal = 10     // 心跳间隔为10s
 )
 
-// MongoDB
+// MongoDB配置
 const (
 	PROTOCOL       = "mongodb"
 	USERNAME       = "mongouser"
