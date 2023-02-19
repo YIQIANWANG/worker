@@ -71,7 +71,7 @@ func (hs *HeartbeatService) GetGlobalGroups() (*data.GlobalGroups, error) {
 	// 统计每个Group的可用Storage
 	now := time.Now().Unix()
 	for _, rawInfo := range rawInfos {
-		if now-rawInfo.UpdateTime <= 15 {
+		if now-rawInfo.UpdateTime <= 1.5*conf.HeartbeatInternal {
 			groupInfos[rawInfo.GroupID] = append(groupInfos[rawInfo.GroupID], data.Storage{StorageAddress: rawInfo.StorageAddress})
 			groupsExist[rawInfo.GroupID] = true
 			storagesExist[rawInfo.StorageAddress] = true

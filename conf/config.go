@@ -8,9 +8,9 @@ const (
 // 服务配置
 const (
 	PORT              = "7777"
-	PrometheusPort    = "9200" // 暴露给Prometheus的端口
-	ChunkMaxSize      = 100000 // Chunk最大为100KB
-	HeartbeatInternal = 10     // 心跳间隔为10s
+	PrometheusPort    = "9200"    // 暴露给Prometheus的端口
+	ChunkMaxSize      = 100000000 // Chunk最大为100MB
+	HeartbeatInternal = 2         // 心跳间隔为2s
 )
 
 // MongoDB配置
