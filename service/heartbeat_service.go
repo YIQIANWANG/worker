@@ -149,6 +149,9 @@ func (hs *HeartbeatService) check(newGroups *data.GlobalGroups) {
 						toTransChunkIDs = append(toTransChunkIDs, chunkID)
 					}
 				}
+				if len(toTransChunkIDs) == 0 {
+					return
+				}
 				// 并发转移
 				n := len(newGroups.GroupInfos[groupID])
 				wg := sync.WaitGroup{}
@@ -168,7 +171,7 @@ func (hs *HeartbeatService) check(newGroups *data.GlobalGroups) {
 				for i := 1; i < n; i++ {
 					go func(index int) {
 						sum := 0
-						for _, chunkID := range chunkIDs {
+						for _, chunkID := range toTransChunkIDs {
 							dataSize, err := hs.storageOperator.DelChunk(newGroups.GroupInfos[oldGroupID][index].StorageAddress, chunkID)
 							if err != nil {
 								log.Println("Trans Chunks failed: ", err)
