@@ -3,7 +3,6 @@ package service
 import (
 	"log"
 	"math/rand"
-	"sort"
 	"sync"
 	"time"
 	"worker/conf"
@@ -101,26 +100,28 @@ func (hs *HeartbeatService) getGlobalGroups() (*data.GlobalGroups, error) {
 		}
 	}
 
-	// 对每个Group并发PING Storage，按时延排序
-	for groupID, _ := range groupInfos {
-		var lock sync.Mutex
-		wg := sync.WaitGroup{}
-		wg.Add(len(groupInfos[groupID].Storages))
-		for i := range groupInfos[groupID].Storages {
-			go func(i int) {
-				start := time.Now()
-				hs.storageOperator.PING(groupInfos[groupID].Storages[i].StorageAddress)
-				lock.Lock()
-				groupInfos[groupID].Storages[i].Latency = time.Since(start).Milliseconds()
-				lock.Unlock()
-				wg.Done()
-			}(i)
+	/*
+		// 对每个Group并发PING Storage，按时延排序
+		for groupID, _ := range groupInfos {
+			var lock sync.Mutex
+			wg := sync.WaitGroup{}
+			wg.Add(len(groupInfos[groupID].Storages))
+			for i := range groupInfos[groupID].Storages {
+				go func(i int) {
+					start := time.Now()
+					hs.storageOperator.PING(groupInfos[groupID].Storages[i].StorageAddress)
+					lock.Lock()
+					groupInfos[groupID].Storages[i].Latency = time.Since(start).Milliseconds()
+					lock.Unlock()
+					wg.Done()
+				}(i)
+			}
+			wg.Wait()
+			sort.Slice(groupInfos[groupID], func(i, j int) bool {
+				return groupInfos[groupID].Storages[i].Latency < groupInfos[groupID].Storages[j].Latency
+			})
 		}
-		wg.Wait()
-		sort.Slice(groupInfos[groupID], func(i, j int) bool {
-			return groupInfos[groupID].Storages[i].Latency < groupInfos[groupID].Storages[j].Latency
-		})
-	}
+	*/
 
 	return &data.GlobalGroups{
 		GroupInfos: groupInfos,
