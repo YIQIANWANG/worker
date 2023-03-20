@@ -58,12 +58,12 @@ func (ps *PrometheusService) InitMetrics() {
 	prometheus.MustRegister(Duration)
 	prometheus.MustRegister(AvailableCapacity)
 	prometheus.MustRegister(ActiveNodes)
-	groups, _ := ps.mongoOperator.GetGroups()
-	for _, group := range groups {
-		AvailableCapacity.WithLabelValues(group.GroupID).Set(float64(group.AvailableCap))
+	groupInfos := data.Groups.GroupInfos
+	for groupID := range groupInfos {
+		AvailableCapacity.WithLabelValues(groupID).Set(float64(groupInfos[groupID].AvailableCap))
 	}
-	for groupID, _ := range data.Groups.GroupInfos {
-		ActiveNodes.WithLabelValues(groupID).Set(float64(len(data.Groups.GroupInfos[groupID])))
+	for groupID := range groupInfos {
+		ActiveNodes.WithLabelValues(groupID).Set(float64(len(groupInfos)))
 	}
 	go func() {
 		http.Handle("/metrics", promhttp.Handler())
@@ -77,12 +77,12 @@ func (ps *PrometheusService) InitMetrics() {
 func (ps *PrometheusService) StartReport() {
 	go func() {
 		for true {
-			groups, _ := ps.mongoOperator.GetGroups()
-			for _, group := range groups {
-				AvailableCapacity.WithLabelValues(group.GroupID).Set(float64(group.AvailableCap))
+			groupInfos := data.Groups.GroupInfos
+			for groupID := range groupInfos {
+				AvailableCapacity.WithLabelValues(groupID).Set(float64(groupInfos[groupID].AvailableCap))
 			}
-			for groupID, _ := range data.Groups.GroupInfos {
-				ActiveNodes.WithLabelValues(groupID).Set(float64(len(data.Groups.GroupInfos[groupID])))
+			for groupID := range groupInfos {
+				ActiveNodes.WithLabelValues(groupID).Set(float64(len(groupInfos)))
 			}
 			time.Sleep(conf.HeartbeatInternal * time.Second)
 		}

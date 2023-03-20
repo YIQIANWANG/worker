@@ -1,6 +1,6 @@
 package conf
 
-// 文件存放路径
+// LogFilePath 日志文件存放路径
 const (
 	LogFilePath = "logs"
 )

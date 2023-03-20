@@ -21,7 +21,7 @@ func (bs *BucketService) CreateBucket(userName, bucketName string) error {
 	}
 	err := bs.mongoOperator.UpdateUserAppendBucket(userName, bucket)
 	if err != nil {
-		log.Println("Create Bucket Failed: ", err)
+		log.Println("CreateBucket Failed: ", err)
 		return err
 	}
 
@@ -31,7 +31,7 @@ func (bs *BucketService) CreateBucket(userName, bucketName string) error {
 func (bs *BucketService) ShowBucket(userName, bucketName string) ([]string, error) {
 	fileNames, err := bs.mongoOperator.GetFileNamesByUserNameAndBucketName(userName, bucketName)
 	if err != nil {
-		log.Println("Show Bucket Failed: ", err)
+		log.Println("ShowBucket Failed: ", err)
 		return nil, err
 	}
 
@@ -42,7 +42,7 @@ func (bs *BucketService) DeleteBucket(userName, bucketName string) error {
 	// 获取待删除文件
 	fileNames, err := bs.mongoOperator.GetFileNamesByUserNameAndBucketName(userName, bucketName)
 	if err != nil {
-		log.Println("Delete Bucket Failed: ", err)
+		log.Println("DeleteBucket Failed: ", err)
 		return err
 	}
 
@@ -50,14 +50,14 @@ func (bs *BucketService) DeleteBucket(userName, bucketName string) error {
 	for _, fileName := range fileNames {
 		err = bs.fileService.DelFile(userName, bucketName, fileName)
 		if err != nil {
-			log.Println("Delete Bucket Failed: ", err)
+			log.Println("DeleteBucket Failed: ", err)
 		}
 	}
 
-	// 更新桶数据
+	// 更新存储桶信息
 	err = bs.mongoOperator.UpdateUserDeleteBucket(userName, bucketName)
 	if err != nil {
-		log.Println("Delete Bucket Failed: ", err)
+		log.Println("DeleteBucket Failed: ", err)
 		return err
 	}
 

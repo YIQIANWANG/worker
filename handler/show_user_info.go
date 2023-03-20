@@ -10,7 +10,7 @@ func ShowUser(c *gin.Context) {
 	userName := c.Query("userName")
 
 	userService := app.Default.GetUserService()
-	user, err := userService.GetUserStatistics(userName)
+	user, err := userService.ShowUser(userName)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"message": err})
 		return

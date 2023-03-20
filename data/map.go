@@ -7,8 +7,8 @@ type GlobalMap struct {
 }
 
 type MappingInfo struct {
-	ShardIDStart uint32
-	ShardIDEnd   uint32
-	GroupID      string
-	OldGroupID   string
+	Start      uint32
+	End        uint32
+	GroupID    string
+	OldGroupID string
 }

@@ -52,8 +52,8 @@ func (mo *MongoOperator) GetStorages() ([]model.Storage, error) {
 	return storages, nil
 }
 
-func (mo *MongoOperator) UpdateMappingInfoDeleteOldGroupID(shardIDStart, shardIDEnd uint32) error {
-	filter := bson.M{"shardIDStart": shardIDStart, "shardIDEnd": shardIDEnd}
+func (mo *MongoOperator) UpdateMappingInfoDeleteOldGroupID(start, end uint32) error {
+	filter := bson.M{"start": start, "end": end}
 	update := bson.M{"$set": bson.M{"oldGroupID": ""}}
 	_, err := mo.mongoClient.GetDataBase().Collection(consts.MappingInfos).UpdateOne(context.TODO(), filter, update)
 
@@ -77,46 +77,6 @@ func (mo *MongoOperator) GetMappingInfos() ([]model.MappingInfo, error) {
 	}
 
 	return mappingInfos, nil
-}
-
-func (mo *MongoOperator) UpdateGroupAvailableCap(groupID string, increase int) error {
-	filter := bson.M{"groupID": groupID}
-	update := bson.M{"$inc": bson.M{"availableCap": increase}}
-	_, err := mo.mongoClient.GetDataBase().Collection(consts.Groups).UpdateOne(context.TODO(), filter, update)
-
-	return err
-}
-
-func (mo *MongoOperator) GetGroup(groupID string) (*model.Group, error) {
-	filter := bson.M{"groupID": groupID}
-	findRes := mo.mongoClient.GetDataBase().Collection(consts.Groups).FindOne(context.TODO(), filter)
-
-	var group model.Group
-	err := findRes.Decode(&group)
-	if err != nil {
-		return nil, err
-	}
-
-	return &group, nil
-}
-
-func (mo *MongoOperator) GetGroups() ([]model.Group, error) {
-	filter := bson.D{{}}
-	cursor, err := mo.mongoClient.GetDataBase().Collection(consts.Groups).Find(context.TODO(), filter)
-	if err != nil {
-		return nil, err
-	}
-
-	defer func(cursor *mongo.Cursor, ctx context.Context) {
-		_ = cursor.Close(ctx)
-	}(cursor, context.TODO())
-	var groups []model.Group
-	err = cursor.All(context.TODO(), &groups)
-	if err != nil {
-		return nil, err
-	}
-
-	return groups, nil
 }
 
 func (mo *MongoOperator) UpdateUserAppendBucket(userName string, bucket *model.Bucket) error {

@@ -8,51 +8,43 @@ import (
 	"time"
 	"worker/app"
 	"worker/conf"
-	"worker/data"
 	"worker/service"
 )
 
 func init() {
-	LogInit()
+	InitLog()
 	app.InitDefault()
-	DataInit()
-	PrometheusInit()
+	InitHeartBeat()
+	InitPrometheus()
 }
 
-func LogInit() {
-	if !service.PathExists(conf.LogFilePath) {
-		err := os.MkdirAll(conf.LogFilePath, os.ModePerm)
-		if err != nil {
-			panic(err)
-		}
+func InitLog() {
+	if service.PathExists(conf.LogFilePath) {
+		_ = os.RemoveAll(conf.LogFilePath)
 	}
-
-	// error log
-	logFile := fmt.Sprintf("%s/%s-%s-%s", conf.LogFilePath, time.Now().Format("2006"), time.Now().Format("01"), time.Now().Format("02"))
-	file, err := os.OpenFile(logFile, os.O_CREATE|os.O_APPEND|os.O_RDWR, os.ModePerm) // 创建、追加、读写，777（所有权限）
+	err := os.MkdirAll(conf.LogFilePath, os.ModePerm)
 	if err != nil {
 		panic(err)
 	}
-	multiWriter := io.MultiWriter(os.Stdout, file)
+
+	// Log
+	logFileName := fmt.Sprintf("%s/%s-%s-%s", conf.LogFilePath, time.Now().Format("2006"), time.Now().Format("01"), time.Now().Format("02"))
+	logFile, err := os.OpenFile(logFileName, os.O_CREATE|os.O_APPEND|os.O_RDWR, os.ModePerm) // 创建、追加、读写，777（所有权限）
+	if err != nil {
+		panic(err)
+	}
+	multiWriter := io.MultiWriter(os.Stdout, logFile)
 	log.SetOutput(multiWriter)
 	log.SetFlags(log.Ldate | log.Ltime | log.Lshortfile)
 }
 
-func DataInit() {
+func InitHeartBeat() {
 	heartbeatService := app.Default.GetHeartbeatService()
-	var err error
-	data.Map, err = heartbeatService.GetGlobalMap()
-	if err != nil {
-		panic(err)
-	}
-	data.Groups, err = heartbeatService.GetGlobalGroups()
-	if err != nil {
-		panic(err)
-	}
+	heartbeatService.InitData()
 	heartbeatService.StartCheck()
 }
 
-func PrometheusInit() {
+func InitPrometheus() {
 	prometheusService := app.Default.GetPrometheusService()
 	prometheusService.InitMetrics()
 	prometheusService.StartReport()

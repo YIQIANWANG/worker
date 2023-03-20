@@ -36,7 +36,7 @@ func getShardIDByChunkID(chunkID string) uint32 {
 func getGroupIDsByChunkID(chunkID string) []string {
 	shardID := getShardIDByChunkID(chunkID)
 	for _, mappingInfo := range data.Map.MappingInfos {
-		if mappingInfo.ShardIDStart <= shardID && shardID < mappingInfo.ShardIDEnd {
+		if mappingInfo.Start <= shardID && shardID < mappingInfo.End {
 			return []string{mappingInfo.GroupID, mappingInfo.OldGroupID}
 		}
 	}

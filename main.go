@@ -16,7 +16,6 @@ func main() {
 	router.DELETE("/file", handler.DelFile)
 	router.GET("/user", handler.ShowUser)
 	router.GET("/PING", handler.PING)
-	router.GET("/RESET", handler.RESET)
 	router.GET("/GROUPS", handler.GROUPS)
 
 	err := router.Run(":" + conf.PORT)

@@ -3,9 +3,15 @@ package data
 var Groups *GlobalGroups
 
 type GlobalGroups struct {
-	GroupInfos    map[string][]Storage // 每个Group含有的Storage信息
-	GroupsExist   map[string]bool      // 当前记录的GroupID
-	StoragesExist map[string]bool      // 当前记录的StorageID
+	GroupInfos map[string]*GroupInfo
+	GroupSet   map[string]bool // 当前活跃的Group集合
+	StorageSet map[string]bool // 当前活跃的Storage集合
+}
+
+type GroupInfo struct {
+	Storages     []Storage
+	Capacity     int
+	AvailableCap int
 }
 
 type Storage struct {

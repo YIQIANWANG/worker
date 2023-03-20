@@ -14,10 +14,10 @@ func NewUserService(mongoOperator *operator.MongoOperator) *UserService {
 	return &UserService{mongoOperator: mongoOperator}
 }
 
-func (us *UserService) GetUserStatistics(userName string) (*model.User, error) {
+func (us *UserService) ShowUser(userName string) (*model.User, error) {
 	user, err := us.mongoOperator.GetUser(userName)
 	if err != nil {
-		log.Println("Get UserInfo Failed: ", err)
+		log.Println("ShowUser Failed: ", err)
 		return nil, err
 	}
 

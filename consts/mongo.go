@@ -4,7 +4,6 @@ package consts
 const (
 	Storages     = "storages"
 	MappingInfos = "mappingInfos"
-	Groups       = "groups"
 	Users        = "users"
 	Chunks       = "chunks"
 )
