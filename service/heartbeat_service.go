@@ -21,11 +21,11 @@ func NewHeartbeatService(mongoOperator *operator.MongoOperator, storageOperator 
 
 func (hs *HeartbeatService) InitData() {
 	var err error
-	data.Map, err = hs.getGlobalMap()
+	data.Map, err = hs.getMap()
 	if err != nil {
 		panic(err)
 	}
-	data.Groups, err = hs.getGlobalGroups()
+	data.Groups, err = hs.getGroups()
 	if err != nil {
 		panic(err)
 	}
@@ -35,7 +35,7 @@ func (hs *HeartbeatService) StartCheck() {
 	go func() {
 		for true {
 			go func() {
-				newMap, err := hs.getGlobalMap()
+				newMap, err := hs.getMap()
 				if err != nil {
 					log.Println("GetGlobalMap Failed: ", err)
 					return
@@ -43,7 +43,7 @@ func (hs *HeartbeatService) StartCheck() {
 				data.Map = newMap
 			}()
 			go func() {
-				newGroups, err := hs.getGlobalGroups()
+				newGroups, err := hs.getGroups()
 				if err != nil {
 					log.Println("GetGlobalGroups Failed: ", err)
 					return
@@ -55,31 +55,29 @@ func (hs *HeartbeatService) StartCheck() {
 	}()
 }
 
-func (hs *HeartbeatService) getGlobalMap() (*data.GlobalMap, error) {
+func (hs *HeartbeatService) getMap() (data.MappingInfos, error) {
 	rawInfos, err := hs.mongoOperator.GetMappingInfos()
 	if err != nil {
 		return nil, err
 	}
-	mappingInfos := make([]data.MappingInfo, 0)
+	mappingInfos := make([]*data.MappingInfo, 0)
 	for _, rawInfo := range rawInfos {
-		mappingInfos = append(mappingInfos, data.MappingInfo{
+		mappingInfos = append(mappingInfos, &data.MappingInfo{
 			Start:      rawInfo.Start,
 			End:        rawInfo.End,
 			GroupID:    rawInfo.GroupID,
 			OldGroupID: rawInfo.OldGroupID,
 		})
 	}
-	return &data.GlobalMap{MappingInfos: mappingInfos}, nil
+	return mappingInfos, nil
 }
 
-func (hs *HeartbeatService) getGlobalGroups() (*data.GlobalGroups, error) {
+func (hs *HeartbeatService) getGroups() (data.GroupInfos, error) {
 	rawInfos, err := hs.mongoOperator.GetStorages()
 	if err != nil {
 		return nil, err
 	}
 	groupInfos := make(map[string]*data.GroupInfo)
-	groupSet := make(map[string]bool)
-	storageSet := make(map[string]bool)
 
 	// 统计每个Group的可用Storage
 	now := time.Now().Unix()
@@ -88,13 +86,11 @@ func (hs *HeartbeatService) getGlobalGroups() (*data.GlobalGroups, error) {
 			if groupInfos[rawInfo.GroupID] == nil {
 				groupInfos[rawInfo.GroupID] = &data.GroupInfo{}
 			}
-			groupInfos[rawInfo.GroupID].Storages = append(groupInfos[rawInfo.GroupID].Storages, data.Storage{StorageAddress: rawInfo.StorageAddress})
+			groupInfos[rawInfo.GroupID].Storages = append(groupInfos[rawInfo.GroupID].Storages, &data.Storage{StorageAddress: rawInfo.StorageAddress})
 			groupInfos[rawInfo.GroupID].Capacity = rawInfo.Capacity
 			if groupInfos[rawInfo.GroupID].AvailableCap > rawInfo.AvailableCap {
 				groupInfos[rawInfo.GroupID].AvailableCap = rawInfo.AvailableCap
 			}
-			groupSet[rawInfo.GroupID] = true
-			storageSet[rawInfo.StorageAddress] = true
 		} else {
 			_ = hs.mongoOperator.DeleteStorage(rawInfo.StorageAddress)
 		}
@@ -123,23 +119,19 @@ func (hs *HeartbeatService) getGlobalGroups() (*data.GlobalGroups, error) {
 		}
 	*/
 
-	return &data.GlobalGroups{
-		GroupInfos: groupInfos,
-		GroupSet:   groupSet,
-		StorageSet: storageSet,
-	}, nil
+	return groupInfos, nil
 }
 
 // 新Group进行数据迁移，对旧Group新Storage进行数据同步
-func (hs *HeartbeatService) check(newGroups *data.GlobalGroups) {
-	for groupID := range newGroups.GroupInfos {
+func (hs *HeartbeatService) check(newGroups data.GroupInfos) {
+	for groupID := range newGroups {
 		// 新Group出现
-		if !data.Groups.GroupSet[groupID] {
+		if data.Groups[groupID] == nil {
 			log.Println("Find New Group, GroupID: ", groupID)
 			// 在映射信息中查找新加入Group对应的OldGroupID
 			found := false
 			var oldGroupID string
-			for _, mappingInfo := range data.Map.MappingInfos {
+			for _, mappingInfo := range data.Map {
 				if mappingInfo.GroupID == groupID {
 					found = true
 					oldGroupID = mappingInfo.OldGroupID
@@ -148,7 +140,6 @@ func (hs *HeartbeatService) check(newGroups *data.GlobalGroups) {
 			}
 			// 若Map还未更新，Groups需要在下个心跳更新
 			if !found {
-				delete(newGroups.GroupSet, groupID)
 				return
 			}
 			// 系统首次启动，不需要转移数据
@@ -157,10 +148,10 @@ func (hs *HeartbeatService) check(newGroups *data.GlobalGroups) {
 			}
 			dst := make([]string, 0)
 			src := make([]string, 0)
-			for _, storage := range newGroups.GroupInfos[groupID].Storages {
+			for _, storage := range newGroups[groupID].Storages {
 				dst = append(dst, storage.StorageAddress)
 			}
-			for _, storage := range newGroups.GroupInfos[oldGroupID].Storages {
+			for _, storage := range newGroups[oldGroupID].Storages {
 				src = append(src, storage.StorageAddress)
 			}
 			// 获取需要转移的ChunkID
@@ -180,7 +171,7 @@ func (hs *HeartbeatService) check(newGroups *data.GlobalGroups) {
 				hs.transChunks(dst, src, toTransChunkIDs)
 			}
 			// MappingInfos更新
-			for _, mappingInfo := range data.Map.MappingInfos {
+			for _, mappingInfo := range data.Map {
 				if mappingInfo.GroupID == groupID {
 					err := hs.mongoOperator.UpdateMappingInfoDeleteOldGroupID(mappingInfo.Start, mappingInfo.End)
 					if err != nil {
@@ -192,9 +183,16 @@ func (hs *HeartbeatService) check(newGroups *data.GlobalGroups) {
 		} else {
 			dst := make([]string, 0)
 			src := make([]string, 0)
-			for _, storage := range newGroups.GroupInfos[groupID].Storages {
+			for _, storage := range newGroups[groupID].Storages {
+				found := false
+				for i := range data.Groups[groupID].Storages {
+					if storage.StorageAddress == data.Groups[groupID].Storages[i].StorageAddress {
+						found = true
+						break
+					}
+				}
 				// 旧Group新Storage出现
-				if !data.Groups.StorageSet[storage.StorageAddress] {
+				if !found {
 					log.Printf("Find New Storage in %s, StorageAddress: %s\n", groupID, storage.StorageAddress)
 					dst = append(dst, storage.StorageAddress)
 				} else {

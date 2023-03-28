@@ -125,15 +125,3 @@ func (so *StorageOperator) PING(storageAddress string) {
 	}(resp.Body)
 	return
 }
-
-func (so *StorageOperator) RESET(storageAddress string) {
-	reqUrl, _ := url.Parse("http://" + storageAddress + "/RESET")
-	resp, err := http.Get(reqUrl.String())
-	if err != nil {
-		return
-	}
-	defer func(Body io.ReadCloser) {
-		_ = Body.Close()
-	}(resp.Body)
-	return
-}

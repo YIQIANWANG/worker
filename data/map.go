@@ -1,10 +1,8 @@
 package data
 
-var Map *GlobalMap
+var Map MappingInfos
 
-type GlobalMap struct {
-	MappingInfos []MappingInfo
-}
+type MappingInfos []*MappingInfo
 
 type MappingInfo struct {
 	Start      uint32

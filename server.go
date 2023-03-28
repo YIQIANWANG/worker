@@ -12,13 +12,13 @@ import (
 )
 
 func init() {
-	InitLog()
+	initLog()
 	app.InitDefault()
-	InitHeartBeat()
-	InitPrometheus()
+	initHeartbeat()
+	initPrometheus()
 }
 
-func InitLog() {
+func initLog() {
 	if service.PathExists(conf.LogFilePath) {
 		_ = os.RemoveAll(conf.LogFilePath)
 	}
@@ -38,13 +38,13 @@ func InitLog() {
 	log.SetFlags(log.Ldate | log.Ltime | log.Lshortfile)
 }
 
-func InitHeartBeat() {
+func initHeartbeat() {
 	heartbeatService := app.Default.GetHeartbeatService()
 	heartbeatService.InitData()
 	heartbeatService.StartCheck()
 }
 
-func InitPrometheus() {
+func initPrometheus() {
 	prometheusService := app.Default.GetPrometheusService()
 	prometheusService.InitMetrics()
 	prometheusService.StartReport()
