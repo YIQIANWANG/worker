@@ -58,7 +58,7 @@ func (ps *PrometheusService) InitMetrics() {
 	prometheus.MustRegister(Duration)
 	prometheus.MustRegister(AvailableCapacity)
 	prometheus.MustRegister(ActiveNodes)
-	groupInfos := data.Groups.GroupInfos
+	groupInfos := data.Groups
 	for groupID := range groupInfos {
 		AvailableCapacity.WithLabelValues(groupID).Set(float64(groupInfos[groupID].AvailableCap))
 	}
@@ -77,7 +77,7 @@ func (ps *PrometheusService) InitMetrics() {
 func (ps *PrometheusService) StartReport() {
 	go func() {
 		for true {
-			groupInfos := data.Groups.GroupInfos
+			groupInfos := data.Groups
 			for groupID := range groupInfos {
 				AvailableCapacity.WithLabelValues(groupID).Set(float64(groupInfos[groupID].AvailableCap))
 			}

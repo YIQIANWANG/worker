@@ -173,8 +173,10 @@ func (fs *FileService) getChunk(chunkID string) ([]byte, error) {
 	for _, storage := range data.Groups[groupIDs[0]].Storages {
 		storagesAddress[0] = append(storagesAddress[0], storage.StorageAddress)
 	}
-	for _, storage := range data.Groups[groupIDs[1]].Storages {
-		storagesAddress[1] = append(storagesAddress[1], storage.StorageAddress)
+	if data.Groups[groupIDs[1]] != nil {
+		for _, storage := range data.Groups[groupIDs[1]].Storages {
+			storagesAddress[1] = append(storagesAddress[1], storage.StorageAddress)
+		}
 	}
 
 	// 请求Storage
@@ -224,8 +226,10 @@ func (fs *FileService) delChunk(chunkID string) error {
 	for _, storage := range data.Groups[groupIDs[0]].Storages {
 		storagesAddress[0] = append(storagesAddress[0], storage.StorageAddress)
 	}
-	for _, storage := range data.Groups[groupIDs[1]].Storages {
-		storagesAddress[1] = append(storagesAddress[1], storage.StorageAddress)
+	if data.Groups[groupIDs[1]] != nil {
+		for _, storage := range data.Groups[groupIDs[1]].Storages {
+			storagesAddress[1] = append(storagesAddress[1], storage.StorageAddress)
+		}
 	}
 
 	// 请求Storages
@@ -244,8 +248,8 @@ func (fs *FileService) delChunk(chunkID string) error {
 			_ = fs.storageOperator.DelChunk(address, chunkID)
 		}(address)
 	}
-	wg[0].Done()
-	wg[1].Done()
+	wg[0].Wait()
+	wg[1].Wait()
 
 	// 更新业务数据
 	err := fs.mongoOperator.DeleteChunk(chunkID)
