@@ -131,7 +131,7 @@ func (fs *FileService) putChunk(userName, bucketName, fileName string, chunkData
 
 	// 选择Storages
 	var storagesAddress []string
-	for _, storage := range data.Groups.GroupInfos[groupID].Storages {
+	for _, storage := range data.Groups[groupID].Storages {
 		storagesAddress = append(storagesAddress, storage.StorageAddress)
 	}
 
@@ -170,10 +170,10 @@ func (fs *FileService) getChunk(chunkID string) ([]byte, error) {
 
 	// 选择Storages
 	storagesAddress := make([][]string, 2)
-	for _, storage := range data.Groups.GroupInfos[groupIDs[0]].Storages {
+	for _, storage := range data.Groups[groupIDs[0]].Storages {
 		storagesAddress[0] = append(storagesAddress[0], storage.StorageAddress)
 	}
-	for _, storage := range data.Groups.GroupInfos[groupIDs[1]].Storages {
+	for _, storage := range data.Groups[groupIDs[1]].Storages {
 		storagesAddress[1] = append(storagesAddress[1], storage.StorageAddress)
 	}
 
@@ -221,10 +221,10 @@ func (fs *FileService) delChunk(chunkID string) error {
 
 	// 选择Storages
 	var storagesAddress [2][]string
-	for _, storage := range data.Groups.GroupInfos[groupIDs[0]].Storages {
+	for _, storage := range data.Groups[groupIDs[0]].Storages {
 		storagesAddress[0] = append(storagesAddress[0], storage.StorageAddress)
 	}
-	for _, storage := range data.Groups.GroupInfos[groupIDs[1]].Storages {
+	for _, storage := range data.Groups[groupIDs[1]].Storages {
 		storagesAddress[1] = append(storagesAddress[1], storage.StorageAddress)
 	}
 
